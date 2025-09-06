@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>네이버 부동산 데이터 분석</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .download-btn {
+            background-color: #27ae60;
+        }
+        .download-btn:hover {
+            background-color: #219a52;
+        }
+        .clear-btn {
+            background-color: #e74c3c;
+        }
+        .clear-btn:hover {
+            background-color: #c0392b;
+        }
+        
+        /* 컨트롤 섹션 */
+        .controls-section {
+            background-color: #ecf0f1;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .control-group input:focus, .control-group select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+        .filter-active {
+            background-color: #fff3cd !important;
+            border-color: #ffc107 !important;
+        }
+        
+        /* 차트 섹션 */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+            display: none;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .chart-container h3 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #34495e;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }
+        th:hover {
+            background-color: #2c3e50;
+        }
+        th.sortable::after {
+            content: ' ↕️';
+            opacity: 0.6;
+            font-size: 12px;
+        }
+        th.sort-asc::after {
+            content: ' ↑';
+            opacity: 1;
+            color: #3498db;
+        }
+        th.sort-desc::after {
+            content: ' ↓';
+            opacity: 1;
+            color: #3498db;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #e8f4fd;
+        }
+        .summary {
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .summary h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #3498db;
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        .error {
+            color: #e74c3c;
+            background-color: #fadbd8;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #27ae60;
+            background-color: #d5f4e6;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+        
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+            table {
+                font-size: 12px;
+            }
+            th, td {
+                padding: 6px 4px;
+            }
+            .container {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 네이버 부동산 데이터 분석</h1>
+        
+        <div>
+            <label for="jsonInput"><strong>JSON 데이터를 여기에 붙여넣으세요:</strong></label>
+            <textarea id="jsonInput" placeholder="네이버 부동산 API 응답값을 여기에 붙여넣으세요..."></textarea>
+        </div>
+        
+        <div style="text-align: center;">
+            <button onclick="analyzeData()">📊 데이터 분석하기</button>
+            <button class="download-btn" onclick="downloadCSV()" id="downloadCsvBtn" style="display:none">💾 CSV 다운로드</button>
+            <button class="download-btn" onclick="downloadExcel()" id="downloadExcelBtn" style="display:none">📊 Excel 다운로드</button>
+            <button class="clear-btn" onclick="clearData()">🗑️ 초기화</button>
+        </div>
+        
+        <div class="loading" id="loading">분석 중입니다...</div>
+        <div id="result"></div>
+        
+        <!-- 컨트롤 섹션 -->
+        <div id="controlsSection" class="controls-section">
+            <div class="controls-grid">
+                <div class="control-group">
+                    <label for="searchInput">🔍 실시간 검색</label>
+                    <input type="text" id="searchInput" placeholder="매물명, 중개업소, 태그 등..." oninput="applyFilters()">
+                </div>
+                <div class="control-group">
+                    <label for="realEstateTypeFilter">🏢 부동산 종류</label>
+                    <select id="realEstateTypeFilter" onchange="applyFilters()">
+                        <option value="">전체</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="minPrice">💰 최소 가격 (억)</label>
+                    <input type="number" id="minPrice" placeholder="0" step="0.1" oninput="applyFilters()">
+                </div>
+                <div class="control-group">
+                    <label for="maxPrice">💰 최대 가격 (억)</label>
+                    <input type="number" id="maxPrice" placeholder="100" step="0.1" oninput="applyFilters()">
+                </div>
+                <div class="control-group">
+                    <label for="minArea">📐 최소 면적 (㎡)</label>
+                    <input type="number" id="minArea" placeholder="0" oninput="applyFilters()">
+                </div>
+                <div class="control-group">
+                    <label for="maxArea">📐 최대 면적 (㎡)</label>
+                    <input type="number" id="maxArea" placeholder="1000" oninput="applyFilters()">
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <button onclick="resetFilters()">🔄 필터 초기화</button>
+                <span id="filterInfo" style="margin-left: 20px; color: #666;"></span>
+            </div>
+        </div>
+        
+        <!-- 차트 섹션 -->
+        <div id="chartsSection" class="charts-section">
+            <div class="chart-container">
+                <h3>💰 가격대별 분포</h3>
+                <canvas id="priceChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>🏢 부동산 종류별 분포</h3>
+                <canvas id="typeChart"></canvas>
+            </div>
+        </div>
+        
+        <div id="summarySection"></div>
+        <div id="tableContainer"></div>
+    </div>
+
+    <script>
+        let originalData = [];
+        let filteredData = [];
+        let sortColumn = null;
+        let sortDirection = 'asc';
+        let charts = {};
+
+        function analyzeData() {
+            console.log('분석 시작');
+            
+            const jsonInput = document.getElementById('jsonInput').value.trim();
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            if (!jsonInput) {
+                showError('JSON 데이터를 입력해주세요.');
+                return;
+            }
+            
+            loading.style.display = 'block';
+            result.innerHTML = '';
+            
+            try {
+                const data = JSON.parse(jsonInput);
+                const articleList = data.articleList || [];
+                
+                if (articleList.length === 0) {
+                    showError('매물 데이터가 없습니다.');
+                    loading.style.display = 'none';
+                    return;
+                }
+                
+                // 기본 데이터 처리 (검증유형 완전 제거)
+                originalData = articleList.map(article => {
+                    return {
+                        '매물번호': article.articleNo || '',
+                        '매물명': article.articleName || '',
+                        '부동산종류': article.realEstateTypeName || '',
+                        '매물구분': article.articleRealEstateTypeName || '',
+                        '거래유형': article.tradeTypeName || '',
+                        '가격': article.dealOrWarrantPrc || '',
+                        '전용면적': article.area1 || 0,
+                        '공급면적': article.area2 || 0,
+                        '층수정보': formatFloorInfo(article.floorInfo),
+                        '방향': article.direction || '',
+                        '확인일자': formatDate(article.articleConfirmYmd),
+                        '특징설명': article.articleFeatureDesc || '',
+                        '태그': (article.tagList || []).join(', '),
+                        '중개업소': article.realtorName || '',
+                        '가격변동': getPriceChangeState(article.priceChangeState),
+                        '위도': article.latitude || '',
+                        '경도': article.longitude || '',
+                        '_priceNum': extractPriceNumber(article.dealOrWarrantPrc || '')
+                    };
+                });
+                
+                filteredData = [...originalData];
+                
+                setupFilters();
+                displayResults();
+                showSuccess(`총 ${originalData.length}개의 매물 데이터를 분석했습니다!`);
+                updateFilterInfo();
+                
+            } catch (error) {
+                console.error('분석 오류:', error);
+                showError('JSON 데이터 형식이 올바르지 않습니다: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function setupFilters() {
+            const typeFilter = document.getElementById('realEstateTypeFilter');
+            const types = [...new Set(originalData.map(item => item.부동산종류).filter(Boolean))];
+            typeFilter.innerHTML = '<option value="">전체</option>';
+            types.forEach(type => {
+                typeFilter.innerHTML += `<option value="${type}">${type}</option>`;
+            });
+        }
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const typeFilter = document.getElementById('realEstateTypeFilter').value;
+            const minPrice = parseFloat(document.getElementById('minPrice').value) || 0;
+            const maxPrice = parseFloat(document.getElementById('maxPrice').value) || Infinity;
+            const minArea = parseFloat(document.getElementById('minArea').value) || 0;
+            const maxArea = parseFloat(document.getElementById('maxArea').value) || Infinity;
+            
+            filteredData = originalData.filter(item => {
+                if (searchTerm) {
+                    const searchableFields = [
+                        item.매물명, item.중개업소, item.태그, 
+                        item.특징설명, item.부동산종류, item.매물구분, item.거래유형
+                    ];
+                    const found = searchableFields.some(field => 
+                        String(field || '').toLowerCase().includes(searchTerm)
+                    );
+                    if (!found) return false;
+                }
+                
+                if (typeFilter && item.부동산종류 !== typeFilter) {
+                    return false;
+                }
+                
+                if (item._priceNum < minPrice || item._priceNum > maxPrice) {
+                    return false;
+                }
+                
+                const area = parseFloat(item.전용면적) || 0;
+                if (area < minArea || area > maxArea) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            updateFilterInfo();
+            updateDisplay();
+        }
+
+        function updateFilterInfo() {
+            const filterInfo = document.getElementById('filterInfo');
+            const totalOriginal = originalData.length;
+            const totalFiltered = filteredData.length;
+            
+            if (totalFiltered === totalOriginal) {
+                filterInfo.textContent = `전체 ${totalOriginal}개 매물`;
+                filterInfo.style.color = '#666';
+            } else {
+                filterInfo.textContent = `${totalFiltered}개 매물 (전체 ${totalOriginal}개 중)`;
+                filterInfo.style.color = '#e74c3c';
+                filterInfo.style.fontWeight = 'bold';
+            }
+            
+            const inputs = ['searchInput', 'minPrice', 'maxPrice', 'minArea', 'maxArea'];
+            inputs.forEach(id => {
+                const input = document.getElementById(id);
+                if (input.value) {
+                    input.classList.add('filter-active');
+                } else {
+                    input.classList.remove('filter-active');
+                }
+            });
+            
+            const select = document.getElementById('realEstateTypeFilter');
+            if (select.value) {
+                select.classList.add('filter-active');
+            } else {
+                select.classList.remove('filter-active');
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('realEstateTypeFilter').value = '';
+            document.getElementById('minPrice').value = '';
+            document.getElementById('maxPrice').value = '';
+            document.getElementById('minArea').value = '';
+            document.getElementById('maxArea').value = '';
+            
+            const inputs = ['searchInput', 'realEstateTypeFilter', 'minPrice', 'maxPrice', 'minArea', 'maxArea'];
+            inputs.forEach(id => {
+                document.getElementById(id).classList.remove('filter-active');
+            });
+            
+            filteredData = [...originalData];
+            updateFilterInfo();
+            updateDisplay();
+        }
+
+        function displayResults() {
+            document.getElementById('controlsSection').style.display = 'block';
+            document.getElementById('chartsSection').style.display = 'grid';
+            document.getElementById('downloadCsvBtn').style.display = 'inline-block';
+            document.getElementById('downloadExcelBtn').style.display = 'inline-block';
+            
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            createSummary();
+            updateCharts();
+            createTable();
+        }
+
+        function updateCharts() {
+            updatePriceChart();
+            updateTypeChart();
+        }
+
+        function updatePriceChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            if (charts.price) {
+                charts.price.destroy();
+            }
+            
+            // 새로운 가격대 구간
+            const priceRanges = {
+                '3억 미만': 0,
+                '3-5억': 0,
+                '5-7억': 0,
+                '7-10억': 0,
+                '10-20억': 0,
+                '20억 이상': 0
+            };
+            
+            filteredData.forEach(item => {
+                const price = item._priceNum;
+                if (price < 3) priceRanges['3억 미만']++;
+                else if (price < 5) priceRanges['3-5억']++;
+                else if (price < 7) priceRanges['5-7억']++;
+                else if (price < 10) priceRanges['7-10억']++;
+                else if (price < 20) priceRanges['10-20억']++;
+                else priceRanges['20억 이상']++;
+            });
+            
+            charts.price = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(priceRanges),
+                    datasets: [{
+                        label: '매물 수',
+                        data: Object.values(priceRanges),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function updateTypeChart() {
+            const ctx = document.getElementById('typeChart').getContext('2d');
+            
+            if (charts.type) {
+                charts.type.destroy();
+            }
+            
+            const typeCounts = {};
+            filteredData.forEach(item => {
+                const type = item.부동산종류 || '미분류';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+            
+            charts.type = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(typeCounts),
+                    datasets: [{
+                        data: Object.values(typeCounts),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        function createSummary() {
+            const summarySection = document.getElementById('summarySection');
+            const data = filteredData;
+            
+            const realEstateTypes = {};
+            const realtors = {};
+            
+            data.forEach(item => {
+                realEstateTypes[item.부동산종류] = (realEstateTypes[item.부동산종류] || 0) + 1;
+                realtors[item.중개업소] = (realtors[item.중개업소] || 0) + 1;
+            });
+            
+            const avgArea1 = (data.reduce((sum, item) => sum + (parseFloat(item.전용면적) || 0), 0) / data.length).toFixed(1);
+            const avgArea2 = (data.reduce((sum, item) => sum + (parseFloat(item.공급면적) || 0), 0) / data.length).toFixed(1);
+            
+            // 새로운 가격대 분포
+            const priceRanges = { 
+                '3억 미만': 0, 
+                '3-5억': 0, 
+                '5-7억': 0, 
+                '7-10억': 0, 
+                '10-20억': 0, 
+                '20억 이상': 0 
+            };
+            
+            data.forEach(item => {
+                const priceNum = item._priceNum;
+                if (priceNum < 3) priceRanges['3억 미만']++;
+                else if (priceNum < 5) priceRanges['3-5억']++;
+                else if (priceNum < 7) priceRanges['5-7억']++;
+                else if (priceNum < 10) priceRanges['7-10억']++;
+                else if (priceNum < 20) priceRanges['10-20억']++;
+                else priceRanges['20억 이상']++;
+            });
+            
+            summarySection.innerHTML = `
+                <div class="summary">
+                    <h3>📈 데이터 요약</h3>
+                    <p><strong>총 매물 수:</strong> ${data.length}개</p>
+                    <p><strong>평균 전용면적:</strong> ${avgArea1}㎡ | <strong>평균 공급면적:</strong> ${avgArea2}㎡</p>
+                    <p><strong>부동산 종류:</strong> ${Object.keys(realEstateTypes).map(key => `${key}(${realEstateTypes[key]}개)`).join(', ')}</p>
+                    <p><strong>가격대 분포:</strong> ${Object.entries(priceRanges).filter(([k,v]) => v > 0).map(([range, count]) => `${range}(${count}개)`).join(', ')}</p>
+                    <p><strong>주요 중개업소:</strong> ${Object.entries(realtors).sort((a,b) => b[1] - a[1]).slice(0,3).map(([name, count]) => `${name}(${count}개)`).join(', ')}</p>
+                </div>
+            `;
+        }
+
+        function createTable() {
+            const tableContainer = document.getElementById('tableContainer');
+            
+            if (filteredData.length === 0) {
+                tableContainer.innerHTML = '<p style="text-align: center; padding: 20px; background: #fff3cd; border-radius: 5px; color: #856404;">필터 조건에 맞는 데이터가 없습니다. 필터를 조정해보세요.</p>';
+                return;
+            }
+            
+            const headers = Object.keys(filteredData[0]).filter(key => !key.startsWith('_'));
+            const headerRow = headers.map(header => 
+                `<th class="sortable" onclick="sortTable('${header}')">${header}</th>`
+            ).join('');
+            
+            const rows = filteredData.map(row => {
+                const cells = headers.map(header => {
+                    let cellValue = row[header] || '';
+                    
+                    if (header === '매물번호' && cellValue) {
+                        const naverUrl = `https://fin.land.naver.com/articles/${cellValue}`;
+                        return `<td><a href="${naverUrl}" target="_blank" rel="noopener">${cellValue} 🔗</a></td>`;
+                    }
+                    else if (header === '위도' && cellValue && row['경도']) {
+                        const mapUrl = `https://map.naver.com/p/search/${cellValue},${row['경도']}`;
+                        return `<td><a href="${mapUrl}" target="_blank" rel="noopener" style="color: #e74c3c;">${cellValue} 🗺️</a></td>`;
+                    }
+                    else if (header === '경도' && cellValue && row['위도']) {
+                        const mapUrl = `https://map.naver.com/p/search/${row['위도']},${cellValue}`;
+                        return `<td><a href="${mapUrl}" target="_blank" rel="noopener" style="color: #e74c3c;">${cellValue} 🗺️</a></td>`;
+                    }
+                    
+                    return `<td>${cellValue}</td>`;
+                }).join('');
+                return `<tr>${cells}</tr>`;
+            }).join('');
+            
+            tableContainer.innerHTML = `
+                <div style="margin-bottom: 10px; text-align: right; color: #666;">
+                    <small>💡 헤더를 클릭하면 해당 컬럼으로 정렬됩니다</small>
+                </div>
+                <table>
+                    <thead><tr>${headerRow}</tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+            
+            if (sortColumn) {
+                const currentHeader = document.querySelector(`th[onclick="sortTable('${sortColumn}')"]`);
+                if (currentHeader) {
+                    currentHeader.className = `sortable sort-${sortDirection}`;
+                }
+            }
+        }
+
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            
+            filteredData.sort((a, b) => {
+                let aVal = a[column];
+                let bVal = b[column];
+                
+                if (column === '전용면적' || column === '공급면적') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                } else if (column === '가격') {
+                    aVal = a._priceNum || 0;
+                    bVal = b._priceNum || 0;
+                } else {
+                    aVal = String(aVal || '').toLowerCase();
+                    bVal = String(bVal || '').toLowerCase();
+                }
+                
+                let result = 0;
+                if (aVal < bVal) result = -1;
+                else if (aVal > bVal) result = 1;
+                
+                return sortDirection === 'desc' ? -result : result;
+            });
+            
+            createTable();
+        }
+
+        function downloadCSV() {
+            if (filteredData.length === 0) {
+                showError('다운로드할 데이터가 없습니다.');
+                return;
+            }
+            
+            const csvData = filteredData.map(row => {
+                const newRow = {...row};
+                delete newRow._priceNum;
+                newRow['네이버부동산링크'] = `https://fin.land.naver.com/articles/${row['매물번호']}`;
+                if (row['위도'] && row['경도']) {
+                    newRow['네이버지도링크'] = `https://map.naver.com/p/search/${row['위도']},${row['경도']}`;
+                }
+                return newRow;
+            });
+            
+            const headers = Object.keys(csvData[0]);
+            const csvContent = [
+                headers.join(','),
+                ...csvData.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+            ].join('\n');
+            
+            const bom = '\uFEFF';
+            const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.href = url;
+            link.download = `부동산데이터_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            showSuccess('CSV 파일이 다운로드되었습니다!');
+        }
+
+        function downloadExcel() {
+            if (filteredData.length === 0) {
+                showError('다운로드할 데이터가 없습니다.');
+                return;
+            }
+            
+            const excelData = filteredData.map(row => {
+                const newRow = {...row};
+                delete newRow._priceNum;
+                
+                if (row['매물번호']) {
+                    newRow['네이버부동산링크'] = `https://fin.land.naver.com/articles/${row['매물번호']}`;
+                }
+                if (row['위도'] && row['경도']) {
+                    newRow['네이버지도링크'] = `https://map.naver.com/p/search/${row['위도']},${row['경도']}`;
+                }
+                return newRow;
+            });
+            
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            
+            const headers = Object.keys(excelData[0]);
+            const colWidths = headers.map(header => {
+                const maxLength = Math.max(
+                    header.length,
+                    ...excelData.slice(0, 100).map(row => String(row[header] || '').length)
+                );
+                return { wch: Math.min(maxLength + 2, 50) };
+            });
+            ws['!cols'] = colWidths;
+            
+            excelData.forEach((row, rowIndex) => {
+                const actualRowIndex = rowIndex + 1;
+                
+                if (row['네이버부동산링크']) {
+                    const colIndex = headers.indexOf('네이버부동산링크');
+                    const cellRef = XLSX.utils.encode_cell({ r: actualRowIndex, c: colIndex });
+                    if (ws[cellRef]) {
+                        ws[cellRef] = {
+                            v: row['네이버부동산링크'],
+                            l: { 
+                                Target: row['네이버부동산링크'], 
+                                Tooltip: '네이버 부동산에서 매물 보기' 
+                            }
+                        };
+                    }
+                }
+                
+                if (row['네이버지도링크']) {
+                    const colIndex = headers.indexOf('네이버지도링크');
+                    const cellRef = XLSX.utils.encode_cell({ r: actualRowIndex, c: colIndex });
+                    if (ws[cellRef]) {
+                        ws[cellRef] = {
+                            v: row['네이버지도링크'],
+                            l: { 
+                                Target: row['네이버지도링크'], 
+                                Tooltip: '네이버 지도에서 위치 보기' 
+                            }
+                        };
+                    }
+                }
+            });
+            
+            const headerRange = XLSX.utils.decode_range(ws['!ref']);
+            for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+                const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+                if (ws[cellRef]) {
+                    ws[cellRef].s = {
+                        font: { bold: true, color: { rgb: "FFFFFF" } },
+                        fill: { fgColor: { rgb: "366092" } }
+                    };
+                }
+            }
+            
+            XLSX.utils.book_append_sheet(wb, ws, '부동산 데이터');
+            
+            const fileName = `부동산데이터_${new Date().toISOString().slice(0,10)}_${filteredData.length}건.xlsx`;
+            XLSX.writeFile(wb, fileName);
+            
+            showSuccess(`Excel 파일이 다운로드되었습니다! (${filteredData.length}건의 데이터, 하이퍼링크 포함)`);
+        }
+
+        function clearData() {
+            document.getElementById('jsonInput').value = '';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('summarySection').innerHTML = '';
+            document.getElementById('tableContainer').innerHTML = '';
+            document.getElementById('controlsSection').style.display = 'none';
+            document.getElementById('chartsSection').style.display = 'none';
+            document.getElementById('downloadCsvBtn').style.display = 'none';
+            document.getElementById('downloadExcelBtn').style.display = 'none';
+            originalData = [];
+            filteredData = [];
+            
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+        }
+
+        function formatFloorInfo(floorInfo) {
+            if (!floorInfo) return '';
+            
+            const floorStr = String(floorInfo).trim();
+            
+            if (floorStr.endsWith('층')) {
+                return floorStr;
+            }
+            
+            return floorStr + '층';
+        }
+
+        function getPriceChangeState(state) {
+            const states = {
+                'SAME': '동일',
+                'UP': '상승',
+                'DOWN': '하락',
+                'INCREASE': '상승',
+                'DECREASE': '하락'
+            };
+            return states[state] || state || '';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            if (dateStr.length === 8) {
+                return `${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}`;
+            }
+            return dateStr;
+        }
+
+        function extractPriceNumber(priceStr) {
+            if (!priceStr) return 0;
+            
+            const match = priceStr.match(/(\d+(?:\.\d+)?)억/);
+            if (match) {
+                let price = parseFloat(match[1]);
+                
+                const remainMatch = priceStr.match(/억\s*(\d+(?:,\d+)*)/);
+                if (remainMatch) {
+                    const remainAmount = parseFloat(remainMatch[1].replace(/,/g, ''));
+                    price += remainAmount / 10000;
+                }
+                
+                return price;
+            }
+            
+            const manMatch = priceStr.match(/^(\d+(?:,\d+)*)$/);
+            if (manMatch) {
+                const manPrice = parseFloat(manMatch[1].replace(/,/g, ''));
+                return manPrice / 10000;
+            }
+            
+            return 0;
+        }
+
+        function showError(message) {
+            document.getElementById('result').innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        function showSuccess(message) {
+            document.getElementById('result').innerHTML = `<div class="success">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
