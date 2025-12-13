@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>부동산 매물 분석</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .upload-section {
+            background: #f9f9f9;
+            padding: 30px;
+            border-radius: 8px;
+            border: 2px dashed #ccc;
+            margin-bottom: 30px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            resize: vertical;
+        }
+        
+        button {
+            margin-top: 15px;
+            padding: 12px 30px;
+            background: #2d3e50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #1f2c38;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #2d3e50;
+            color: white;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-size: 13px;
+        }
+        
+        tbody tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        
+        tbody tr:hover {
+            background: #f0f0f0;
+        }
+        
+        .message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        a {
+            color: #2d3e50;
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏠 부동산 매물 분석</h1>
+        
+        <div class="upload-section">
+            <h3 style="margin-bottom: 15px;">JSON 데이터 붙여넣기</h3>
+            <textarea id="jsonInput" placeholder="JSON 데이터를 여기에 붙여넣으세요..."></textarea>
+            <button onclick="parseJSON()">표로 정리</button>
+        </div>
+        
+        <div id="message"></div>
+        
+        <div id="dataSection" style="display: none;">
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>물건번호</th>
+                            <th>물건명</th>
+                            <th>부동산유형</th>
+                            <th>거래가</th>
+                            <th>면적1</th>
+                            <th>면적2</th>
+                            <th>방향</th>
+                            <th>층수</th>
+                            <th>중개인</th>
+                            <th>설명</th>
+                            <th>확인일자</th>
+                            <th>매물링크</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function parseJSON() {
+            const input = document.getElementById('jsonInput').value.trim();
+            
+            if (!input) {
+                showMessage('JSON 데이터를 입력해주세요', 'error');
+                return;
+            }
+            
+            try {
+                const json = JSON.parse(input);
+                const data = json.articleList || json;
+                
+                if (!Array.isArray(data) || data.length === 0) {
+                    throw new Error('유효한 데이터가 없습니다');
+                }
+                
+                renderTable(data);
+                document.getElementById('dataSection').style.display = 'block';
+                showMessage(`${data.length}개 매물 로드 완료`, 'success');
+                
+            } catch (error) {
+                showMessage('JSON 파싱 오류: ' + error.message, 'error');
+            }
+        }
+        
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                const date = formatDate(item.articleConfirmYmd);
+                
+                tr.innerHTML = `
+                    <td>${item.articleNo || '-'}</td>
+                    <td>${item.articleName || '-'}</td>
+                    <td>${item.realEstateTypeName || '-'}</td>
+                    <td>${item.dealOrWarrantPrc || '-'}</td>
+                    <td>${item.area1 || '-'}㎡</td>
+                    <td>${item.area2 || '-'}㎡</td>
+                    <td>${item.direction || '-'}</td>
+                    <td>${item.floorInfo || '-'}층</td>
+                    <td>${item.realtorName || '-'}</td>
+                    <td>${item.articleFeatureDesc || '-'}</td>
+                    <td>${date}</td>
+                    <td><a href="https://fin.land.naver.com/articles/${item.articleNo}" target="_blank">보기</a></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        function formatDate(dateStr) {
+            if (!dateStr || dateStr.length !== 8) return '-';
+            return `${dateStr.substring(0,4)}-${dateStr.substring(4,6)}-${dateStr.substring(6,8)}`;
+        }
+        
+        function showMessage(text, type) {
+            const div = document.getElementById('message');
+            div.className = 'message ' + type;
+            div.textContent = text;
+            setTimeout(() => div.textContent = '', 3000);
+        }
+    </script>
+</body>
+</html>
